@@ -7,11 +7,13 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from routers import user, auth, predict,admin,model
 
 app = FastAPI()
-
+# ดึง environment variable
+origins = os.getenv("FRONTEND_URLS", "")
+# แปลงเป็น list
+allow_origins = [url.strip() for url in origins.split(",") if url.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173",
-    "https://senior-steel-sigma.vercel.app"],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
