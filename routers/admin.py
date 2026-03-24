@@ -6,8 +6,7 @@ from typing import Optional
 from datetime import datetime
 
 router = APIRouter()
-def get_database():
-    return get_db()
+db = get_db()
 
 
 class UpdateUser(BaseModel):

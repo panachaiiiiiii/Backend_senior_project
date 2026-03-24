@@ -8,8 +8,7 @@ load_dotenv()
 MODEL_API_URL = os.getenv("APIPATH")
 
 router = APIRouter()
-def get_database():
-    return get_db()
+db = get_db()
 
 MODEL_STATUS = {
     "modelA": True,

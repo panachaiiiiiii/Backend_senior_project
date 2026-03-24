@@ -14,8 +14,7 @@ from passlib.context import CryptContext
 load_dotenv()
 
 router = APIRouter()
-def get_database():
-    return get_db()
+db = get_db()
 security = HTTPBearer()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
