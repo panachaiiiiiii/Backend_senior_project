@@ -1,0 +1,52 @@
+# 🐍 Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# 📦 Virtual env
+venv/
+env/
+.venv/
+
+# 🔐 Environment variables
+.env
+.env.*
+
+# 🔥 Firebase / Secret Keys
+firebase_key.json
+*key.json
+*secret.json
+credentials.json
+
+# 🧠 Model files (ใหญ่ / ไม่ควร push)
+*.h5
+*.keras
+*.pt
+*.pth
+*.onnx
+
+# 📊 Logs
+*.log
+
+# 🧪 Testing / cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 🧹 OS
+.DS_Store
+Thumbs.db
+
+# 🐳 Docker
+*.tar
+
+# 🧰 IDE
+.vscode/
+.idea/
+
+# 📁 Uploads / temp files
+uploads/
+tmp/
+temp/
