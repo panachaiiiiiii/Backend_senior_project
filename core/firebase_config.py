@@ -3,15 +3,20 @@ from firebase_admin import credentials, db
 import os
 import json
 
-firebase_key = os.getenv("FIREBASE_KEY")
+def get_db():
+    if not firebase_admin._apps:
 
-if not firebase_key:
-    raise ValueError("FIREBASE_KEY is missing")
+        firebase_key = os.getenv("FIREBASE_KEY")
 
-cred_dict = json.loads(firebase_key)
+        if not firebase_key:
+            raise ValueError("FIREBASE_KEY is missing")
 
-cred = credentials.Certificate(cred_dict)
+        cred_dict = json.loads(firebase_key)
 
-firebase_admin.initialize_app(cred, {
-    "databaseURL": "https://senior-b3690-default-rtdb.asia-southeast1.firebasedatabase.app"
-})
+        cred = credentials.Certificate(cred_dict)
+
+        firebase_admin.initialize_app(cred, {
+            "databaseURL": "https://senior-b3690-default-rtdb.asia-southeast1.firebasedatabase.app"
+        })
+
+    return db
