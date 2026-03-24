@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 import os
 
 import requests
-db = get_db()
+def get_database():
+    return get_db()
 
 load_dotenv()
 MODEL_API_URL = os.getenv("APIPATH")

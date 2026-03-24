@@ -6,7 +6,8 @@ from .auth import create_token, verify_token
 from typing import Optional
 
 router = APIRouter()
-db = get_db()
+def get_database():
+    return get_db()
 
 
 class UpdateUser(BaseModel):
