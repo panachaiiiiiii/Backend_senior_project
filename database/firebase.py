@@ -1,15 +1,21 @@
 import firebase_admin
 from firebase_admin import credentials, db
 import os
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-cred_path = os.path.join(BASE_DIR, "firebase_key.json")
+import json
 
 def get_db():
     if not firebase_admin._apps:
-        cred = credentials.Certificate(cred_path)
+        firebase_key = os.getenv("FIREBASE_KEY")
+
+        if not firebase_key:
+            raise ValueError("FIREBASE_KEY not found in environment")
+
+        cred_dict = json.loads(firebase_key)
+
+        cred = credentials.Certificate(cred_dict)
+
         firebase_admin.initialize_app(cred, {
-            "databaseURL": "https://senior-b3690-default-rtdb.asia-southeast1.firebasedatabase.app"
+            "databaseURL": os.getenv("DATABASE_URL")
         })
 
     return db
