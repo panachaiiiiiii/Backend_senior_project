@@ -18,7 +18,10 @@ origins = os.getenv("FRONTEND_URLS", "")
 allow_origins = [url.strip() for url in origins.split(",") if url.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allow_origins,
+    allow_origins=[
+        "https://senior-iota.vercel.app",
+        "http://localhost:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
