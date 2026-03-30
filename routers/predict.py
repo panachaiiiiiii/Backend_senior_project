@@ -78,7 +78,7 @@ async def predict(
             data = {"model_name": model_name}
 
             response = requests.post(
-                f"{MODEL_API_URL}/predict/",  # ✅ แก้ slash
+                f"{MODEL_API_URL}/predict",  
                 files=files,
                 data=data,
                 timeout=20
