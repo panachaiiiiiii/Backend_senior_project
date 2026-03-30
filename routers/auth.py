@@ -93,11 +93,22 @@ def register(UserRegister: UserRegister):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.options("/login/google")
+async def options_login_google():
+    return {"ok": True}
+
+
 @router.post("/login/google")
 async def login(request: Request):
+    try:
+        body = await request.json()
+    except:
+        body = {}
 
-    body = await request.json()
     access_token = body.get("access_token")
+
+    if not access_token:
+        raise HTTPException(status_code=400, detail="Missing access_token")
 
     user_info = verify_google_token(access_token)
 
