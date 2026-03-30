@@ -1,96 +1,140 @@
 from fastapi import APIRouter, UploadFile, File, Depends, Form, HTTPException
-from PIL import Image
 from database.firebase import get_db
 from datetime import datetime
 from .auth import verify_token
 from dotenv import load_dotenv
 import os
-
 import requests
-db = get_db()
+import traceback
+from supabase import create_client, Client
 
 load_dotenv()
+
+# --- ENV ---
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 MODEL_API_URL = os.getenv("APIPATH")
 
-router = APIRouter(prefix="/predict", tags=["predict"])
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise Exception("❌ Supabase config missing")
 
+if not MODEL_API_URL:
+    raise Exception("❌ MODEL_API_URL missing")
+
+# --- Clients ---
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+BUCKET_NAME = os.getenv("BUCKETS_NAME")
+
+db = get_db()
+
+router = APIRouter(prefix="/predict", tags=["predict"])
 
 
 @router.post("/")
 async def predict(
     file: UploadFile = File(...),
     model_name: str = Form(...),
-    user=Depends(verify_token),  # เปิดถ้าใช้ระบบ auth
+    user=Depends(verify_token),
 ):
-   
-    # ✅ reset pointer ของไฟล์
-    file.file.seek(0)
+    # ✅ Validate user
+    if not user or "uid" not in user:
+        raise HTTPException(status_code=401, detail="Invalid user")
 
-    # ✅ เตรียมส่งไป Model API
-    files = {"file": (file.filename, file.file, file.content_type)}
-    data = {
-        "model_name": model_name  # 🔥 ส่งต่อไป model API
-    }
     try:
-        response = requests.post(
-            MODEL_API_URL+"/predict",
-            files=files,
-            data=data,
-            timeout=15  # เพิ่ม timeout เผื่อ model ใช้เวลานาน
-        )
-        if not response.ok:
-            try:
-                error_json = response.json()
-                detail = error_json.get("detail") or error_json.get("error")
-            except ValueError:
-                detail = response.text
+        print("🚀 START PREDICT")
+        print("USER:", user)
+        print("MODEL_API_URL:", MODEL_API_URL)
 
-            raise HTTPException(
-                status_code=response.status_code,
-                detail=f"Model API error: {detail}"
-            )
+        # --- STEP 1: READ FILE ---
+        file_content = await file.read()
+
+        if not file_content:
+            raise HTTPException(status_code=400, detail="Empty file")
+
+        file_extension = os.path.splitext(file.filename)[1] or ".jpg"
+
+        unique_filename = f"{user['uid']}/{int(datetime.now().timestamp())}{file_extension}"
+        print("FILENAME:", unique_filename)
+
+        # --- STEP 2: UPLOAD TO SUPABASE ---
         try:
-            result = response.json()
-        except ValueError:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Invalid JSON from Model API: {response.text}"
+            supabase.storage.from_(BUCKET_NAME).upload(
+                path=unique_filename,
+                file=file_content,
+                file_options={"content-type": file.content_type}
             )
-        user_ref = db.reference(f"/users/{user['uid']}")
-        user_data = user_ref.get()
 
-        if user_data:
-            ref = db.reference(f"/users/{user['uid']}/results")
-            new_ref = ref.push()
-            new_ref.set({
-                "prediction": result,
-                "created_at": datetime.now().isoformat(),
-            })
+            image_url = supabase.storage.from_(BUCKET_NAME).get_public_url(unique_filename)
+
+        except Exception as e:
+            print("❌ Supabase Error:", e)
+            raise HTTPException(status_code=500, detail=f"Supabase Upload Error: {str(e)}")
+
+        # --- STEP 3: CALL MODEL API ---
+        try:
+            files = {
+                "file": (file.filename, file_content, file.content_type)
+            }
+            data = {"model_name": model_name}
+
+            response = requests.post(
+                f"{MODEL_API_URL}/predict/",  # ✅ แก้ slash
+                files=files,
+                data=data,
+                timeout=20
+            )
+
+            print("MODEL STATUS:", response.status_code)
+
+            if not response.ok:
+                print("❌ Model API Error:", response.text)
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Model API error: {response.text}"
+                )
+
+            result = response.json()
+
+        except requests.Timeout:
+            raise HTTPException(status_code=504, detail="Model API timeout")
+        except Exception as e:
+            print("❌ Model API Crash:", e)
+            raise HTTPException(status_code=500, detail=f"Model API crash: {str(e)}")
+
+        # --- STEP 4: SAVE TO FIREBASE ---
+        try:
+            user_ref = db.reference(f"/users/{user['uid']}")
+            user_data = user_ref.get()
+
+            if user_data:
+                ref = db.reference(f"/users/{user['uid']}/results")
+                new_ref = ref.push()
+                new_ref.set({
+                    "prediction": result,
+                    "image_url": image_url,
+                    "file_path": unique_filename,
+                    "created_at": datetime.now().isoformat(),
+                    "model_name": model_name
+                })
+            else:
+                print("⚠️ User not found in Firebase, skip saving")
+
+        except Exception as e:
+            print("❌ Firebase Error:", e)
+            # ❗ไม่ต้อง fail ทั้ง request
+            # แค่ log พอ
+
+        # --- SUCCESS ---
         return {
             "result": result,
-            "model_name": result.get("model_name") or model_name
+            "image_url": image_url,
+            "model_name": model_name
         }
 
-    except requests.Timeout:
-        raise HTTPException(status_code=504, detail="Model API timeout")
+    except HTTPException:
+        raise
 
-    except requests.ConnectionError:
-        raise HTTPException(status_code=502, detail="Cannot connect to Model API")
-
-    except HTTPException as e:
-        raise HTTPException(
-            status_code=e.status_code,
-            detail=f"[Predict API] {e.detail}"
-        )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Unexpected error: {str(e)}"
-        )
-
-    # ✅ บันทึก Firebase
-
-
-
-    
-    # "model": model_name
+        print("🔥 UNEXPECTED ERROR")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
