@@ -145,14 +145,14 @@ async def login(request: Request):
 @router.post("/login")
 def login(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
-        print("🔥 HIT LOGIN")
+        
         token = credentials.credentials
         if not credentials:
             raise HTTPException(status_code=401, detail="No credentials")
-        print("TOKEN LENGTH:", len(token))
+        
 
         decoded = verify_id_token(token)
-        print("DECODED:", decoded)
+        
 
         uid = decoded.get("uid") or decoded.get("user_id")
 

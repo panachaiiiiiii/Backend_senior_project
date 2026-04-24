@@ -56,19 +56,7 @@ async def predict(
         unique_filename = f"{user['uid']}/{int(datetime.now().timestamp())}{file_extension}"
         print("FILENAME:", unique_filename)
 
-        # --- STEP 2: UPLOAD TO SUPABASE ---
-        try:
-            supabase.storage.from_(BUCKET_NAME).upload(
-                path=unique_filename,
-                file=file_content,
-                file_options={"content-type": file.content_type}
-            )
 
-            image_url = supabase.storage.from_(BUCKET_NAME).get_public_url(unique_filename)
-
-        except Exception as e:
-            print("❌ Supabase Error:", e)
-            raise HTTPException(status_code=500, detail=f"Supabase Upload Error: {str(e)}")
 
         # --- STEP 3: CALL MODEL API ---
         try:
@@ -83,8 +71,10 @@ async def predict(
                 data=data,
                 timeout=20
             )
-
+            print("MODEL_API_URL:", MODEL_API_URL)
             print("MODEL STATUS:", response.status_code)
+            print("RESPONSE:", response.text)
+            
 
             if not response.ok:
                 print("❌ Model API Error:", response.text)
@@ -100,7 +90,20 @@ async def predict(
         except Exception as e:
             print("❌ Model API Crash:", e)
             raise HTTPException(status_code=500, detail=f"Model API crash: {str(e)}")
+        # --- STEP 2: UPLOAD TO SUPABASE ---
+        try:
+            supabase.storage.from_(BUCKET_NAME).upload(
+                path=unique_filename,
+                file=file_content,
+                file_options={"content-type": file.content_type}
+            )
 
+            image_url = supabase.storage.from_(BUCKET_NAME).get_public_url(unique_filename)
+
+        except Exception as e:
+            print("❌ Supabase Error:", e)
+            raise HTTPException(status_code=500, detail=f"Supabase Upload Error: {str(e)}")
+        
         # --- STEP 4: SAVE TO FIREBASE ---
         try:
             user_ref = db.reference(f"/users/{user['uid']}")
@@ -121,13 +124,11 @@ async def predict(
 
         except Exception as e:
             print("❌ Firebase Error:", e)
-            # ❗ไม่ต้อง fail ทั้ง request
-            # แค่ log พอ
 
         # --- SUCCESS ---
         return {
             "result": result,
-            "image_url": image_url,
+            # "image_url": image_url,
             "model_name": model_name
         }
 
